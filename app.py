@@ -481,7 +481,8 @@ else:
             for message in st.session_state.chat_history:
                 if message["role"] == "user":
                     with st.chat_message("user"):
-                        st.markdown(f"**{message['content']}**")
+                        user_text = message['content'].strip() if isinstance(message.get('content'), str) else str(message.get('content', ''))
+                        st.markdown(f"**{user_text}**")
                 else:
                     with st.chat_message("assistant"):
                         if "Quota Exhausted" in message["answer"]:

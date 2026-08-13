@@ -118,6 +118,11 @@ def apply_custom_styles():
         line-height: 1.65 !important;
     }
 
+    .stMarkdown strong, .stMarkdown b, strong, b {
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+
     /* Sidebar Styling & Decent Compact Layout */
     [data-testid="stSidebar"] {
         background-color: #ffffff !important;
