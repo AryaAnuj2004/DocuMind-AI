@@ -1,0 +1,15 @@
+[theme]
+base = "light"
+primaryColor = "#0f172a"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1e293b"
+
+[server]
+maxUploadSize = 50
+enableXsrfProtection = false
+enableCORS = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = false
