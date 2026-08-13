@@ -1,4 +1,4 @@
-# 🤖 DocuMind AI — An Intelligent Document Assistant
+# DocuMind AI — An Intelligent Document Assistant
 
 DocuMind AI is an AI-powered document analysis and interaction tool built with Google Gemini AI and Streamlit. It enables users to upload PDF and TXT documents, generate executive summaries, ask context-grounded questions with precise page citations, extract domain-specific terminology, create visual mind maps, and test their understanding through interactive knowledge challenges.
 
@@ -25,7 +25,7 @@ The system combines document parsing, retrieval-augmented generation (RAG), cont
 ## 📁 Project Structure
 
 ```text
-Smart Document Assistant/
+DocuMind AI
 ├── app.py                   # Main Streamlit web application interface
 ├── requirements.txt         # Project dependencies
 ├── .env.example             # Example environment configuration template
@@ -66,7 +66,7 @@ Ensure you have **Python 3.9+** installed on your system.
 
 ### 2. Navigate to Project Directory
 ```bash
-cd "Smart Document Assistant"
+cd "DocuMind AI"
 ```
 
 ### 3. Create & Activate a Virtual Environment
