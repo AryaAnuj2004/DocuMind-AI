@@ -6,34 +6,42 @@ import time
 import streamlit as st
 
 CACHE_DIR = ".session_cache"
-IDLE_TIMEOUT_SECONDS = 1800  # 30 Minutes Inactivity Auto-Expiry
+IDLE_TIMEOUT_SECONDS = 600  # 10 Minutes Inactivity Auto-Expiry
 
 def compute_client_fingerprint() -> str:
     """
     Computes a cryptographic SHA-256 fingerprint bound to the client's request headers.
-    Binds session to the user's Browser User-Agent and Host context.
+    Binds session to the user's Browser User-Agent and Accept-Language header.
+    Excludes volatile proxy IP addresses to remain stable on hosted cloud platforms.
     """
     try:
         ua = ""
-        host = ""
+        lang = ""
         if hasattr(st, "context") and hasattr(st.context, "headers"):
             headers = st.context.headers or {}
             ua = headers.get("user-agent", "")
-            host = headers.get("host", "") or headers.get("x-forwarded-for", "")
-        raw_identity = f"{ua}|{host}".encode("utf-8")
+            lang = headers.get("accept-language", "")
+        raw_identity = f"{ua}|{lang}".encode("utf-8")
         return hashlib.sha256(raw_identity).hexdigest()
     except Exception:
         return "default_fingerprint"
 
 def set_session_cookie(sid: str, clear: bool = False):
     """
-    Sets or clears the 'documind_sid' browser session cookie on top-level document.
-    Keeps Session ID and API Key 100% out of the URL bar (http://localhost:8501/).
-    Per RFC 6265 standard, omitting Max-Age and Expires creates a true Browser Session Cookie:
-    - Survived across F5 page refreshes within the tab session.
-    - Automatically deleted by the browser when the tab or window is closed.
+    Sets or clears browser session cookie ('documind_sid') and keeps URL bar 100% clean.
+    Session ID and API Key are strictly kept OUT of the browser URL bar at all times.
     """
     try:
+        # Strictly strip sid and api_key from query params to guarantee a clean URL bar
+        if hasattr(st, "query_params"):
+            try:
+                if "sid" in st.query_params:
+                    del st.query_params["sid"]
+                if "api_key" in st.query_params:
+                    del st.query_params["api_key"]
+            except Exception:
+                pass
+
         if clear:
             cookie_js = "document.cookie = 'documind_sid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax;';"
         else:
@@ -45,17 +53,48 @@ def set_session_cookie(sid: str, clear: bool = False):
             unsafe_allow_html=True
         )
 
-        # Method 2: Fallback iframe injection via components.html
+        # Method 2: Safe iframe fallback injection via components.html with strict URL bar scrubbing
         import streamlit.components.v1 as components
         components.html(
             f"""
             <script>
                 try {{
                     if ("{clear}" === "True") {{
-                        window.parent.document.cookie = "documind_sid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax;";
+                        document.cookie = "documind_sid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax;";
+                        if (window.parent && window.parent !== window) {{
+                            try {{ window.parent.document.cookie = "documind_sid=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax;"; }} catch(e) {{}}
+                        }}
                     }} else {{
-                        window.parent.document.cookie = "documind_sid={sid}; path=/; SameSite=Lax;";
+                        document.cookie = "documind_sid={sid}; path=/; SameSite=Lax;";
+                        if (window.parent && window.parent !== window) {{
+                            try {{ window.parent.document.cookie = "documind_sid={sid}; path=/; SameSite=Lax;"; }} catch(e) {{}}
+                        }}
                     }}
+                    // Immediately scrub any query params from address bar to ensure 100% clean URL
+                    setTimeout(function() {{
+                        try {{
+                            if (window.history && window.history.replaceState) {{
+                                var u = new URL(window.location.href);
+                                if (u.searchParams.has('sid') || u.searchParams.has('api_key')) {{
+                                    u.searchParams.delete('sid');
+                                    u.searchParams.delete('api_key');
+                                    var cleanUrl = u.pathname + (u.search ? u.search : '') + u.hash;
+                                    window.history.replaceState({{}}, document.title, cleanUrl);
+                                }}
+                                if (window.parent && window.parent !== window) {{
+                                    try {{
+                                        var pu = new URL(window.parent.location.href);
+                                        if (pu.searchParams.has('sid') || pu.searchParams.has('api_key')) {{
+                                            pu.searchParams.delete('sid');
+                                            pu.searchParams.delete('api_key');
+                                            var pCleanUrl = pu.pathname + (pu.search ? pu.search : '') + pu.hash;
+                                            window.parent.history.replaceState({{}}, window.parent.document.title, pCleanUrl);
+                                        }}
+                                    }} catch(pe) {{}}
+                                }}
+                            }}
+                        }} catch(e) {{}}
+                    }}, 100);
                 }} catch(e) {{}}
             </script>
             """,
@@ -67,9 +106,8 @@ def set_session_cookie(sid: str, clear: bool = False):
 
 def init_session_cache():
     """
-    Initializes a cryptographically secure session_id using HTTP cookies.
+    Initializes a cryptographically secure session_id using HTTP cookies or st.session_state.
     Session ID and API Key are strictly kept OUT of the browser URL bar.
-    F5 page refreshes retain the session via the 'documind_sid' cookie sent in HTTP headers.
     """
     if not os.path.exists(CACHE_DIR):
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -171,8 +209,9 @@ def load_session_from_disk():
     sid = st.session_state.get("session_id", "")
     if not sid and hasattr(st, "context") and hasattr(st.context, "cookies"):
         sid = st.context.cookies.get("documind_sid", "")
-        if sid:
-            st.session_state.session_id = sid
+    
+    if sid:
+        st.session_state.session_id = sid
 
     if not sid:
         return False
